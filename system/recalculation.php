@@ -178,21 +178,45 @@ if ($getMode == 'preview') // Default
                         // && Beitragszeitraum (cost_period) darf nicht "Jaehrlich" (1) sein
                         if ((strtotime(date('Y') . '-01-01') < $time_begin || $time_end < strtotime(date('Y') . '-12-31')) && ($roldata['rol_cost_period'] != - 1) && ($roldata['rol_cost_period'] != 1)) {
 
-                            if (strtotime(date('Y') . '-01-01') < $time_begin) {
-                                $month_begin = date('n', $time_begin);
+                            if ($roldata['rol_cost_period'] == 4) {
+                                // Tagesbasierte anteilige Beitragsberechnung für Quartalsbeiträge.
+                                // rol_cost wird als Quartalsbeitrag (nicht als Jahresbeitrag) behandelt.
+                                // Die Funktion wird einmal pro Quartal aufgerufen und liefert genau einen Quartalsbeitrag.
+                                $year = (int) date('Y');
+                                $current_quarter = (int) ceil((int) date('n') / 3);
+                                $q_start_month = ($current_quarter - 1) * 3 + 1;
+                                $q_end_month = $current_quarter * 3;
+                                $q_start = mktime(0, 0, 0, $q_start_month, 1, $year);
+                                $q_end_day = cal_days_in_month(CAL_GREGORIAN, $q_end_month, $year);
+                                $q_end = mktime(0, 0, 0, $q_end_month, $q_end_day, $year);
+                                if ($time_begin >= $q_start) {
+                                    // Mitglied ist im laufenden Quartal beigetreten → tagesgenau anteilig
+                                    // Formel: Tage_als_Mitglied_im_Quartal / Tage_im_Quartal * Quartalsbeitrag
+                                    $days_in_quarter = (int) round(($q_end - $q_start) / 86400) + 1;
+                                    $effective_end = min($time_end, $q_end);
+                                    $days_as_member = max(0, (int) round(($effective_end - $time_begin) / 86400) + 1);
+                                    $members[$member]['FEE_NEW'] += $days_as_member / $days_in_quarter * $roldata['rol_cost'];
+                                } else {
+                                    // Mitglied ist vor dem aktuellen Quartal beigetreten → voller Quartalsbeitrag
+                                    $members[$member]['FEE_NEW'] += $roldata['rol_cost'];
+                                }
                             } else {
-                                $month_begin = 1;
-                            }
-                            if (strtotime(date('Y') . '-12-31') > $time_end) {
-                                $month_end = date('n', $time_end);
-                            } else {
-                                $month_end = 12;
-                            }
+                                if (strtotime(date('Y') . '-01-01') < $time_begin) {
+                                    $month_begin = date('n', $time_begin);
+                                } else {
+                                    $month_begin = 1;
+                                }
+                                if (strtotime(date('Y') . '-12-31') > $time_end) {
+                                    $month_end = date('n', $time_end);
+                                } else {
+                                    $month_end = 12;
+                                }
 
-                            $segment_begin = ceil($month_begin * $roldata['rol_cost_period'] / 12);
-                            $segment_end = ceil($month_end * $roldata['rol_cost_period'] / 12);
+                                $segment_begin = ceil($month_begin * $roldata['rol_cost_period'] / 12);
+                                $segment_end = ceil($month_end * $roldata['rol_cost_period'] / 12);
 
-                            $members[$member]['FEE_NEW'] += ($segment_end - $segment_begin + 1) * $roldata['rol_cost'] / $roldata['rol_cost_period'];
+                                $members[$member]['FEE_NEW'] += ($segment_end - $segment_begin + 1) * $roldata['rol_cost'] / $roldata['rol_cost_period'];
+                            }
                             $members[$member]['CONTRIBUTORY_TEXT_NEW'] .= $rolDescription;
 
                             if ($pPreferences->config['Beitrag']['beitrag_suffix'] != '') {
@@ -283,21 +307,43 @@ if ($getMode == 'preview') // Default
                         // && Beitragszeitraum (cost_period) darf nicht "Jaehrlich" (1) sein
                         if ((strtotime(date('Y') . '-01-01') < $time_begin || $time_end < strtotime(date('Y') . '-12-31')) && ($roldata['rol_cost_period'] != - 1) && ($roldata['rol_cost_period'] != 1)) {
 
-                            if (strtotime(date('Y') . '-01-01') < $time_begin) {
-                                $month_begin = date('n', $time_begin);
+                            if ($roldata['rol_cost_period'] == 4) {
+                                // Tagesbasierte anteilige Beitragsberechnung für Quartalsbeiträge (Familienrolle).
+                                // rol_cost wird als Quartalsbeitrag (nicht als Jahresbeitrag) behandelt.
+                                $year = (int) date('Y');
+                                $current_quarter = (int) ceil((int) date('n') / 3);
+                                $q_start_month = ($current_quarter - 1) * 3 + 1;
+                                $q_end_month = $current_quarter * 3;
+                                $q_start = mktime(0, 0, 0, $q_start_month, 1, $year);
+                                $q_end_day = cal_days_in_month(CAL_GREGORIAN, $q_end_month, $year);
+                                $q_end = mktime(0, 0, 0, $q_end_month, $q_end_day, $year);
+                                if ($time_begin >= $q_start) {
+                                    // Mitglied ist im laufenden Quartal beigetreten → tagesgenau anteilig
+                                    $days_in_quarter = (int) round(($q_end - $q_start) / 86400) + 1;
+                                    $effective_end = min($time_end, $q_end);
+                                    $days_as_member = max(0, (int) round(($effective_end - $time_begin) / 86400) + 1);
+                                    $members[$roldata['has_to_pay']]['FEE_NEW'] += $days_as_member / $days_in_quarter * $roldata['rol_cost'];
+                                } else {
+                                    // Mitglied ist vor dem aktuellen Quartal beigetreten → voller Quartalsbeitrag
+                                    $members[$roldata['has_to_pay']]['FEE_NEW'] += $roldata['rol_cost'];
+                                }
                             } else {
-                                $month_begin = 1;
-                            }
-                            if (strtotime(date('Y') . '-12-31') > $time_end) {
-                                $month_end = date('n', $time_end);
-                            } else {
-                                $month_end = 12;
-                            }
+                                if (strtotime(date('Y') . '-01-01') < $time_begin) {
+                                    $month_begin = date('n', $time_begin);
+                                } else {
+                                    $month_begin = 1;
+                                }
+                                if (strtotime(date('Y') . '-12-31') > $time_end) {
+                                    $month_end = date('n', $time_end);
+                                } else {
+                                    $month_end = 12;
+                                }
 
-                            $segment_begin = ceil($month_begin * $roldata['rol_cost_period'] / 12);
-                            $segment_end = ceil($month_end * $roldata['rol_cost_period'] / 12);
+                                $segment_begin = ceil($month_begin * $roldata['rol_cost_period'] / 12);
+                                $segment_end = ceil($month_end * $roldata['rol_cost_period'] / 12);
 
-                            $members[$roldata['has_to_pay']]['FEE_NEW'] += ($segment_end - $segment_begin + 1) * $roldata['rol_cost'] / $roldata['rol_cost_period'];
+                                $members[$roldata['has_to_pay']]['FEE_NEW'] += ($segment_end - $segment_begin + 1) * $roldata['rol_cost'] / $roldata['rol_cost_period'];
+                            }
                             $members[$roldata['has_to_pay']]['CONTRIBUTORY_TEXT_NEW'] = $rolDescription . $pPreferences->config['Beitrag']['beitrag_suffix'] . ' ' . $members[$roldata['has_to_pay']]['CONTRIBUTORY_TEXT_NEW'] . ' ';
                         } else {
                             $members[$roldata['has_to_pay']]['FEE_NEW'] += $roldata['rol_cost'];
